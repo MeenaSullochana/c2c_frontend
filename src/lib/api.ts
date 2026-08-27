@@ -1,7 +1,7 @@
 import { API_ROUTES } from '../shared';
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from './auth-storage';
 
-const API_URL = import.meta.env.VITE_API_URL ?? '/api';
+const API_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '');
 
 export type HealthResponse = {
   status: 'ok' | 'error';
