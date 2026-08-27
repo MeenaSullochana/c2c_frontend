@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { buttonClass, cardClass } from '../components/ui';
 import { completeReminder, fetchReminders } from '../lib/modules-api';
+import { t } from '../lib/i18n';
 
 export function RemindersPage() {
   const queryClient = useQueryClient();
