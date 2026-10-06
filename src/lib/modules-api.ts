@@ -42,12 +42,14 @@ export type Employee = {
   lastName: string;
   email: string;
   phone: string;
-  orgRole: 'MANAGER' | 'SUPERVISOR' | 'STAFF';
+  orgRole: string;
   status: string;
   joiningDate: string;
   dateOfBirth?: string | null;
   gender?: string;
   address?: string;
+  photoUrl?: string;
+  workFromHome?: boolean;
   role?: { id: string; name: string; minAge: number; orgRole: string } | null;
   branch: NamedRef | null;
   department: NamedRef | null;
@@ -62,8 +64,20 @@ export type Lead = {
   email: string;
   phone: string;
   source: string;
+  campaignName?: string;
+  loanType?: string;
+  loanAmount?: number;
+  bankId?: string | null;
+  bank?: { id: string; name: string; code?: string } | null;
+  rsm?: string;
+  team?: string;
+  bdoCode?: string;
+  called?: boolean;
+  connected?: boolean;
+  calledAt?: string | null;
   status: string;
   notes: string;
+  loginRemarks?: string;
   nextFollowUpAt: string | null;
   reminderAt?: string | null;
   reminderDone?: boolean;
@@ -79,6 +93,68 @@ export type Lead = {
     statusAfter: string | null;
     createdAt: string | null;
   }>;
+};
+
+export type C2cDashboard = {
+  scope: string;
+  kpis: {
+    leads: number;
+    called: number;
+    percentCalled: number;
+    connected: number;
+    percentConnected: number;
+  };
+  campaigns: Array<{
+    campaignName: string;
+    leads: number;
+    called: number;
+    connected: number;
+    percentCalled: number;
+    percentConnected: number;
+    statuses: Record<string, number>;
+  }>;
+  locations?: Array<{ location: string; leads: number; statuses: Record<string, number> }>;
+  teams?: Array<{ team: string; leads: number; statuses: Record<string, number> }>;
+  outcome: Array<{ status: string; label: string; count: number; percent: number }>;
+  hourly: Array<{ hour: number; called: number }>;
+  recent: Array<{
+    id: string;
+    name: string;
+    phone: string;
+    campaignName: string;
+    called: boolean;
+    connected: boolean;
+    status: string;
+    statusLabel: string;
+    team: string;
+    rsm: string;
+  }>;
+  filters: {
+    campaigns: string[];
+    rsms: string[];
+    teams: string[];
+    bdoCodes: string[];
+    loanTypes: string[];
+    statuses: string[];
+    regionalLeads: Array<{
+      id: string;
+      name: string;
+      orgRole: string;
+      branchId: string;
+      cityId: string;
+      stateId: string;
+      countryId: string;
+    }>;
+    salesManagers: Array<{
+      id: string;
+      name: string;
+      orgRole: string;
+      branchId: string;
+      cityId: string;
+      stateId: string;
+      countryId: string;
+    }>;
+  };
 };
 
 export type LeaveRow = {
@@ -106,7 +182,13 @@ export function fetchSummary() {
     pendingLeaves: number;
     branches: number;
     dueReminders: number;
+    accessScope?: string;
   }>(API_ROUTES.DASHBOARD_SUMMARY);
+}
+
+export function fetchC2cDashboard(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request<C2cDashboard>(`${API_ROUTES.C2C_DASHBOARD}${query ? `?${query}` : ''}`);
 }
 
 export function fetchLocationTree() {
@@ -194,6 +276,154 @@ export function clockAttendance(employeeId: string, action: 'clock-in' | 'clock-
   });
 }
 
+export type WorkInfoRow = {
+  id: string;
+  employeeCode: string;
+  name: string;
+  email: string;
+  phone: string;
+  orgRole: string;
+  branch: NamedRef | null;
+  joiningDate?: string | null;
+  basicSalary: number;
+  hra: number;
+  allowances: number;
+  deductions: number;
+  grossSalary: number;
+  netSalary: number;
+  leaveRequests: number;
+};
+
+export type WorkInfoDetail = {
+  id: string;
+  employeeCode: string;
+  name: string;
+  email: string;
+  phone: string;
+  gender: string;
+  address: string;
+  orgRole: string;
+  status: string;
+  joiningDate?: string | null;
+  dateOfBirth?: string | null;
+  branch: NamedRef | null;
+  department: NamedRef | null;
+  designation: NamedRef | null;
+  manager: { id: string; name: string } | null;
+  supervisor: { id: string; name: string } | null;
+  basicSalary: number;
+  hra: number;
+  allowances: number;
+  deductions: number;
+  grossSalary: number;
+  netSalary: number;
+  workHistory: Array<{
+    id: string;
+    eventType: string;
+    title: string;
+    detail: string;
+    fromDate: string;
+    toDate: string | null;
+    orgRole: string;
+    branch: NamedRef | null;
+    designation: NamedRef | null;
+  }>;
+  payslips: Array<{
+    id: string;
+    periodKey: string;
+    status: string;
+    basicSalary: number;
+    hra: number;
+    allowances: number;
+    deductions: number;
+    netPay: number;
+    paidAt: string | null;
+  }>;
+  leaves: Array<{
+    id: string;
+    leaveType: string;
+    startDate: string;
+    endDate: string;
+    reason: string;
+    status: string;
+  }>;
+  attendance: Array<{
+    id: string;
+    dateKey: string;
+    clockInAt: string;
+    clockOutAt: string | null;
+  }>;
+};
+
+export type PayslipRow = {
+  id: string;
+  periodKey: string;
+  status: string;
+  basicSalary: number;
+  hra: number;
+  allowances: number;
+  deductions: number;
+  netPay: number;
+  paidAt: string | null;
+  employee: {
+    id: string;
+    name: string;
+    employeeCode: string;
+    branch: NamedRef | null;
+    orgRole?: string;
+  } | null;
+};
+
+export type PayslipDetail = {
+  id: string;
+  periodKey: string;
+  status: string;
+  basicSalary: number;
+  hra: number;
+  allowances: number;
+  deductions: number;
+  netPay: number;
+  paidAt: string | null;
+  createdAt: string | null;
+  employee: {
+    id: string;
+    name: string;
+    employeeCode: string;
+    email: string;
+    phone: string;
+    orgRole?: string;
+    branch: NamedRef | null;
+    joiningDate?: string | null;
+  };
+};
+
+export type PayrollSummary = {
+  totals: { employees: number; monthlySalary: number; payslips: number };
+  byBranch: Array<{ branch: string; employees: number; monthlySalary: number; payslipCount: number }>;
+  employees: WorkInfoRow[];
+};
+
+export function fetchWorkInfo() {
+  return request<WorkInfoRow[]>(API_ROUTES.HRM_WORK_INFO);
+}
+
+export function fetchWorkInfoDetail(id: string) {
+  return request<WorkInfoDetail>(`${API_ROUTES.HRM_WORK_INFO}/${id}`);
+}
+
+export function fetchPayroll() {
+  return request<PayrollSummary>(API_ROUTES.HRM_PAYROLL);
+}
+
+export function fetchPayslips(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request<PayslipRow[]>(`${API_ROUTES.HRM_PAYSLIPS}${query ? `?${query}` : ''}`);
+}
+
+export function fetchPayslip(id: string) {
+  return request<PayslipDetail>(`${API_ROUTES.HRM_PAYSLIPS}/${id}`);
+}
+
 export function fetchLeads(params: Record<string, string> = {}) {
   const query = new URLSearchParams(params).toString();
   return request<Lead[]>(`${API_ROUTES.LEADS}${query ? `?${query}` : ''}`);
@@ -215,7 +445,7 @@ export function fetchRoles() {
       key: string;
       description: string;
       minAge: number;
-      orgRole: 'MANAGER' | 'SUPERVISOR' | 'STAFF';
+      orgRole: string;
       permissions: string[];
     }>
   >(API_ROUTES.HRM_ROLES);
@@ -239,12 +469,12 @@ export function updateBranding(input: Record<string, unknown>) {
 
 export function createFollowUp(
   id: string,
-  input: { note: string; nextFollowUpAt?: string; reminderAt?: string; status?: string },
+  input: { note: string; nextFollowUpAt?: string; reminderAt?: string; status?: string; remarks?: string },
 ) {
   return request(`${API_ROUTES.LEADS}/${id}/follow-ups`, { method: 'POST', body: JSON.stringify(input) });
 }
 
-export function importLeads(files: Array<{ name: string; csvText: string }>) {
+export function importLeads(files: Array<{ name: string; csvText: string }>, branchId: string) {
   return request<{
     batchId: string;
     files: Array<{
@@ -255,6 +485,99 @@ export function importLeads(files: Array<{ name: string; csvText: string }>) {
     }>;
   }>(`${API_ROUTES.LEADS}/import`, {
     method: 'POST',
-    body: JSON.stringify({ files }),
+    body: JSON.stringify({ branchId, files }),
   });
+}
+
+export async function uploadImage(file: File) {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('upload.read_failed'));
+    reader.readAsDataURL(file);
+  });
+  return request<{ url: string; fileName: string; size: number; mimeType: string }>(API_ROUTES.UPLOADS_IMAGE, {
+    method: 'POST',
+    body: JSON.stringify({ dataUrl, fileName: file.name }),
+  });
+}
+
+export type BankRow = { id: string; name: string; code: string; logoUrl: string; status: string };
+
+export function fetchBanks(params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request<BankRow[]>(`${API_ROUTES.WEBSITE_BANKS}${query ? `?${query}` : ''}`);
+}
+
+export function fetchPublicBanks(tenantSlug = 'acme-hr') {
+  return request<BankRow[]>(`${API_ROUTES.WEBSITE_BANKS_PUBLIC}?tenantSlug=${encodeURIComponent(tenantSlug)}`);
+}
+
+export function createBank(input: { name: string; code: string; logoUrl?: string; status?: string }) {
+  return request<BankRow>(API_ROUTES.WEBSITE_BANKS, { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function updateBank(id: string, input: Partial<{ name: string; code: string; logoUrl: string; status: string }>) {
+  return request<BankRow>(`${API_ROUTES.WEBSITE_BANKS}/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+}
+
+export function deleteBank(id: string) {
+  return request(`${API_ROUTES.WEBSITE_BANKS}/${id}`, { method: 'DELETE' });
+}
+
+export function fetchEnquiries() {
+  return request<
+    Array<{
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+      loanType: string;
+      loanAmount: number;
+      bank: NamedRef | null;
+      message: string;
+      status: string;
+      createdAt: string | null;
+    }>
+  >(API_ROUTES.WEBSITE_ENQUIRIES);
+}
+
+export function createEnquiry(input: Record<string, unknown>) {
+  return request(API_ROUTES.WEBSITE_ENQUIRIES, { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function createPublicEnquiry(input: Record<string, unknown>) {
+  return request(API_ROUTES.WEBSITE_ENQUIRIES_PUBLIC, { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function fetchAnnouncements() {
+  return request<
+    Array<{
+      id: string;
+      title: string;
+      body: string;
+      kind: string;
+      imageUrl: string;
+      scope: string;
+      status: string;
+      createdAt: string | null;
+    }>
+  >(API_ROUTES.WEBSITE_ANNOUNCEMENTS);
+}
+
+export function createAnnouncement(input: Record<string, unknown>) {
+  return request(API_ROUTES.WEBSITE_ANNOUNCEMENTS, { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function fetchBirthdaysToday() {
+  return request<{
+    date: string;
+    birthdays: Array<{
+      id: string;
+      name: string;
+      employeeCode: string;
+      photoUrl: string;
+      wishCard: { title: string; body: string };
+    }>;
+  }>(API_ROUTES.WEBSITE_BIRTHDAYS);
 }

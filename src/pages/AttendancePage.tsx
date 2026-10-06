@@ -1,40 +1,68 @@
-import { I18N_KEYS } from '../shared';
+import { I18N_KEYS, PERMISSIONS } from '../shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { buttonClass, cardClass, fieldClass, ghostButtonClass, tableClass } from '../components/ui';
 import { ApiError } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { t, translateMessage } from '../lib/i18n';
 import { clockAttendance, fetchAttendance, fetchEmployees } from '../lib/modules-api';
 
 export function AttendancePage() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const attendance = useQuery({ queryKey: ['attendance'], queryFn: fetchAttendance });
   const employees = useQuery({ queryKey: ['employees'], queryFn: () => fetchEmployees() });
-  const [employeeId, setEmployeeId] = useState('');
+  const canManage = user?.permissions.includes(PERMISSIONS.HRM_ATTENDANCE_MANAGE) ?? false;
+  const selfEmployeeId = user?.employeeId ?? '';
+  const [employeeId, setEmployeeId] = useState(selfEmployeeId);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!canManage && selfEmployeeId) {
+      setEmployeeId(selfEmployeeId);
+    }
+  }, [canManage, selfEmployeeId]);
+
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['attendance'] });
+  const targetId = canManage ? employeeId : selfEmployeeId;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-semibold">{t(I18N_KEYS.NAV_ATTENDANCE)}</h1>
+      <header>
+        <h1 className="text-3xl font-semibold">{t(I18N_KEYS.NAV_ATTENDANCE)}</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          {canManage
+            ? 'Clock and view attendance for employees in your scope (branch / team reports).'
+            : 'Clock in / out for yourself. You only see your own attendance.'}
+        </p>
+      </header>
       {error ? <p className="text-sm text-[#C62127]">{error}</p> : null}
 
       <section className={`${cardClass} flex flex-wrap items-end gap-3`}>
-        <select className={`${fieldClass} max-w-xs`} value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
-          <option value="">Employee</option>
-          {(employees.data ?? []).map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.firstName} {item.lastName}
-            </option>
-          ))}
-        </select>
+        {canManage ? (
+          <select
+            className={`${fieldClass} max-w-xs`}
+            value={employeeId}
+            onChange={(event) => setEmployeeId(event.target.value)}
+          >
+            <option value="">Employee (your reports)</option>
+            {(employees.data ?? []).map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.firstName} {item.lastName}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            {user?.firstName} {user?.lastName}
+          </p>
+        )}
         <button
           type="button"
           className={buttonClass}
-          disabled={!employeeId}
+          disabled={!targetId}
           onClick={() =>
-            clockAttendance(employeeId, 'clock-in')
+            clockAttendance(targetId, 'clock-in')
               .then(refresh)
               .catch((err) => setError(translateMessage(err instanceof ApiError ? err.message : err)))
           }
@@ -44,9 +72,9 @@ export function AttendancePage() {
         <button
           type="button"
           className={ghostButtonClass}
-          disabled={!employeeId}
+          disabled={!targetId}
           onClick={() =>
-            clockAttendance(employeeId, 'clock-out')
+            clockAttendance(targetId, 'clock-out')
               .then(refresh)
               .catch((err) => setError(translateMessage(err instanceof ApiError ? err.message : err)))
           }

@@ -62,10 +62,12 @@ export function LocationsPage() {
               className="mt-4 space-y-2"
               onSubmit={(event) => {
                 event.preventDefault();
-                const form = new FormData(event.currentTarget);
+                const formEl = event.currentTarget;
+                const form = new FormData(formEl);
                 createCountry({ name: String(form.get('name')), code: String(form.get('code')) })
                   .then(() => {
-                    event.currentTarget.reset();
+                    formEl.reset();
+                    setError(null);
                     invalidate();
                   })
                   .catch((err) => setError(translateMessage(err)));
@@ -108,10 +110,12 @@ export function LocationsPage() {
               onSubmit={(event) => {
                 event.preventDefault();
                 if (!countryId) return;
-                const form = new FormData(event.currentTarget);
+                const formEl = event.currentTarget;
+                const form = new FormData(formEl);
                 createState({ countryId, name: String(form.get('name')), code: String(form.get('code')) })
                   .then(() => {
-                    event.currentTarget.reset();
+                    formEl.reset();
+                    setError(null);
                     invalidate();
                   })
                   .catch((err) => setError(translateMessage(err)));
@@ -153,10 +157,12 @@ export function LocationsPage() {
               onSubmit={(event) => {
                 event.preventDefault();
                 if (!stateId) return;
-                const form = new FormData(event.currentTarget);
+                const formEl = event.currentTarget;
+                const form = new FormData(formEl);
                 createCity({ stateId, name: String(form.get('name')) })
                   .then(() => {
-                    event.currentTarget.reset();
+                    formEl.reset();
+                    setError(null);
                     invalidate();
                   })
                   .catch((err) => setError(translateMessage(err)));
@@ -196,7 +202,8 @@ export function LocationsPage() {
               onSubmit={(event) => {
                 event.preventDefault();
                 if (!cityId) return;
-                const form = new FormData(event.currentTarget);
+                const formEl = event.currentTarget;
+                const form = new FormData(formEl);
                 createBranch({
                   cityId,
                   name: String(form.get('name')),
@@ -204,7 +211,8 @@ export function LocationsPage() {
                   address: String(form.get('address') || ''),
                 })
                   .then(() => {
-                    event.currentTarget.reset();
+                    formEl.reset();
+                    setError(null);
                     invalidate();
                   })
                   .catch((err) => setError(translateMessage(err)));

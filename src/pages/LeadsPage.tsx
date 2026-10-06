@@ -1,14 +1,32 @@
-import { I18N_KEYS, PERMISSIONS } from '../shared';
+import { I18N_KEYS, LEAD_STATUS_LABELS, PERMISSIONS } from '../shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buttonClass, cardClass, fieldClass, tableClass } from '../components/ui';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { t, translateMessage } from '../lib/i18n';
+import {
+  filterBranchesForScope,
+  filterCountriesForScope,
+  getLocationScopeLocks,
+  resolveScopedCountryId,
+} from '../lib/location-scope';
 import { createLead, fetchBranches, fetchEmployees, fetchLeads, fetchLocationTree } from '../lib/modules-api';
 
-const statuses = ['NEW', 'CONTACTED', 'FOLLOW_UP', 'QUALIFIED', 'WON', 'LOST'];
+const statuses = [
+  'NOT_CALLED',
+  'CALLED_NOT_CONTACTED',
+  'CONTACTED_NOT_INTERESTED',
+  'CONTACTED_FOLLOWUP',
+  'CONTACTED_NOT_ELIGIBLE',
+  'CONTACTED_INTERESTED',
+  'LOGIN',
+  'LOGIN_APPROVED',
+  'LOGIN_REJECTED',
+  'DISBURSED',
+  'RNR',
+];
 
 export function LeadsPage() {
   const { user } = useAuth();
@@ -16,6 +34,7 @@ export function LeadsPage() {
   const tree = useQuery({ queryKey: ['locations'], queryFn: fetchLocationTree });
   const branches = useQuery({ queryKey: ['branches'], queryFn: fetchBranches });
   const employees = useQuery({ queryKey: ['employees'], queryFn: () => fetchEmployees() });
+  const locks = useMemo(() => getLocationScopeLocks(user), [user]);
   const [filters, setFilters] = useState({
     q: '',
     countryId: '',
@@ -28,6 +47,21 @@ export function LeadsPage() {
   const [createBranchId, setCreateBranchId] = useState('');
   const canCreate = user?.permissions.includes(PERMISSIONS.LEAD_CREATE) ?? false;
 
+  useEffect(() => {
+    if (locks.scope === 'ALL' || !tree.data) return;
+    const nextCountry = resolveScopedCountryId(tree.data, locks);
+    setFilters((current) => ({
+      ...current,
+      countryId: nextCountry || current.countryId,
+      stateId: locks.stateId || current.stateId,
+      cityId: locks.lockCity ? locks.cityId : current.cityId,
+      branchId: locks.lockBranch ? locks.branchId : current.branchId,
+    }));
+    if (locks.lockBranch && locks.branchId) {
+      setCreateBranchId(locks.branchId);
+    }
+  }, [locks, tree.data]);
+
   const activeFilters = useMemo(() => {
     return Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
   }, [filters]);
@@ -37,9 +71,21 @@ export function LeadsPage() {
     queryFn: () => fetchLeads(activeFilters),
   });
 
-  const country = tree.data?.find((item) => item.id === filters.countryId);
+  const scopedCountries = filterCountriesForScope(tree.data, locks);
+  const country = scopedCountries.find((item) => item.id === filters.countryId);
   const state = country?.states.find((item) => item.id === filters.stateId);
-  const selectedBranch = (branches.data ?? []).find((item) => item.id === createBranchId);
+  const branchOptions = filterBranchesForScope(branches.data, locks, {
+    countryId: filters.countryId,
+    stateId: filters.stateId,
+    cityId: filters.cityId,
+  });
+  const createBranchOptions = filterBranchesForScope(branches.data, locks, {
+    countryId: locks.countryId || filters.countryId,
+    stateId: locks.stateId || filters.stateId,
+    cityId: locks.cityId || filters.cityId,
+  });
+  const selectedBranch = createBranchOptions.find((item) => item.id === createBranchId);
+  const lockedSelectClass = `${fieldClass} disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-600`;
 
   return (
     <div className="space-y-6">
@@ -59,23 +105,33 @@ export function LeadsPage() {
           onChange={(event) => setFilters((current) => ({ ...current, q: event.target.value }))}
         />
         <select
-          className={fieldClass}
+          className={lockedSelectClass}
           value={filters.countryId}
+          disabled={locks.lockCountry}
           onChange={(event) =>
-            setFilters((current) => ({ ...current, countryId: event.target.value, stateId: '', cityId: '' }))
+            setFilters((current) => ({
+              ...current,
+              countryId: event.target.value,
+              stateId: '',
+              cityId: '',
+              branchId: '',
+            }))
           }
         >
           <option value="">{t(I18N_KEYS.LOCATION_COUNTRY)}</option>
-          {(tree.data ?? []).map((item) => (
+          {scopedCountries.map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
             </option>
           ))}
         </select>
         <select
-          className={fieldClass}
+          className={lockedSelectClass}
           value={filters.stateId}
-          onChange={(event) => setFilters((current) => ({ ...current, stateId: event.target.value, cityId: '' }))}
+          disabled={locks.lockState}
+          onChange={(event) =>
+            setFilters((current) => ({ ...current, stateId: event.target.value, cityId: '', branchId: '' }))
+          }
         >
           <option value="">{t(I18N_KEYS.LOCATION_STATE)}</option>
           {(country?.states ?? []).map((item) => (
@@ -85,9 +141,12 @@ export function LeadsPage() {
           ))}
         </select>
         <select
-          className={fieldClass}
+          className={lockedSelectClass}
           value={filters.cityId}
-          onChange={(event) => setFilters((current) => ({ ...current, cityId: event.target.value }))}
+          disabled={locks.lockCity}
+          onChange={(event) =>
+            setFilters((current) => ({ ...current, cityId: event.target.value, branchId: '' }))
+          }
         >
           <option value="">{t(I18N_KEYS.LOCATION_CITY)}</option>
           {(state?.cities ?? []).map((item) => (
@@ -97,12 +156,13 @@ export function LeadsPage() {
           ))}
         </select>
         <select
-          className={fieldClass}
+          className={lockedSelectClass}
           value={filters.branchId}
+          disabled={locks.lockBranch}
           onChange={(event) => setFilters((current) => ({ ...current, branchId: event.target.value }))}
         >
           <option value="">{t(I18N_KEYS.BRANCH_TITLE)}</option>
-          {(branches.data ?? []).map((item) => (
+          {branchOptions.map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
             </option>
@@ -116,7 +176,7 @@ export function LeadsPage() {
           <option value="">{t(I18N_KEYS.COMMON_STATUS)}</option>
           {statuses.map((status) => (
             <option key={status} value={status}>
-              {status}
+              {LEAD_STATUS_LABELS[status] ?? status}
             </option>
           ))}
         </select>
@@ -128,7 +188,8 @@ export function LeadsPage() {
             className="grid gap-3 md:grid-cols-2 lg:grid-cols-4"
             onSubmit={(event) => {
               event.preventDefault();
-              const form = new FormData(event.currentTarget);
+              const formEl = event.currentTarget;
+              const form = new FormData(formEl);
               setError(null);
               createLead({
                 name: String(form.get('name')),
@@ -143,7 +204,10 @@ export function LeadsPage() {
                 notes: String(form.get('notes') || ''),
               })
                 .then(() => {
-                  event.currentTarget.reset();
+                  formEl.reset();
+                  if (!locks.lockBranch) {
+                    setCreateBranchId('');
+                  }
                   void queryClient.invalidateQueries({ queryKey: ['leads'] });
                 })
                 .catch((err) => setError(translateMessage(err instanceof ApiError ? err.message : err)));
@@ -155,12 +219,13 @@ export function LeadsPage() {
             <input name="source" placeholder="Source" className={fieldClass} />
             <select
               name="branchId"
-              className={fieldClass}
+              className={lockedSelectClass}
               value={createBranchId}
+              disabled={locks.lockBranch}
               onChange={(event) => setCreateBranchId(event.target.value)}
             >
               <option value="">Branch</option>
-              {(branches.data ?? []).map((item) => (
+              {createBranchOptions.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
                 </option>
@@ -187,25 +252,28 @@ export function LeadsPage() {
         <table className={tableClass}>
           <thead>
             <tr className="text-slate-500">
-              <th className="py-2">Name</th>
-              <th>Location</th>
-              <th>Branch</th>
+              <th className="py-2">Customer</th>
+              <th>Campaign</th>
+              <th>Called</th>
+              <th>Connected</th>
               <th>Status</th>
-              <th>Next follow-up</th>
+              <th>Branch</th>
             </tr>
           </thead>
           <tbody>
             {(leads.data ?? []).map((lead) => (
               <tr key={lead.id} className="border-t border-slate-200">
                 <td className="py-2">
-                  <Link to={`/admin/leads/${lead.id}`} className="text-sky-300">
+                  <Link to={`/admin/leads/${lead.id}`} className="text-[#0087C3]">
                     {lead.name}
                   </Link>
+                  <p className="text-xs text-slate-400">{lead.phone || '—'}</p>
                 </td>
-                <td>{[lead.country?.name, lead.state?.name, lead.city?.name].filter(Boolean).join(' / ')}</td>
+                <td>{lead.campaignName || lead.source || '—'}</td>
+                <td>{lead.called ? 'Y' : 'N'}</td>
+                <td>{lead.connected ? 'Y' : 'N'}</td>
+                <td>{LEAD_STATUS_LABELS[lead.status] ?? lead.status}</td>
                 <td>{lead.branch?.name}</td>
-                <td>{lead.status}</td>
-                <td>{lead.nextFollowUpAt ? String(lead.nextFollowUpAt).slice(0, 10) : '—'}</td>
               </tr>
             ))}
           </tbody>

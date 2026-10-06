@@ -1,3 +1,4 @@
-name,email,phone,source,country,state,city,branch,notes
-Ananya Iyer,ananya@example.test,9884001111,csv,India,Tamil Nadu,Chennai,CHN,Interested in HRM
-Farhan Ali,farhan@example.test,9884002222,csv,IN,KA,Bengaluru,BLR,Asked for a callback
+customer_name,phone,campaign_name,called,connected,status,loan_type,rsm,team,bdo_code,email,notes
+Rajendran,9884702021,SAPL,Y,N,CALLED_NOT_CONTACTED,PL,Kavya Raman,X-Sell,CHN01,rajendran@example.test,Ring no response
+Ananya Iyer,9884001111,XSELLQ2227,Y,Y,CONTACTED_FOLLOWUP,PL,Kavya Raman,X-Sell,CHN01,ananya@example.test,Follow up next week
+Farhan Ali,9884002222,TOP60,N,N,NOT_CALLED,BL,Nikhil Rao,Bengaluru Sales,BLR01,farhan@example.test,Fresh lead

@@ -15,6 +15,7 @@ export function LeavesPage() {
   const employees = useQuery({ queryKey: ['employees'], queryFn: () => fetchEmployees() });
   const [error, setError] = useState<string | null>(null);
   const canManage = user?.permissions.includes(PERMISSIONS.HRM_LEAVE_MANAGE) ?? false;
+  const selfEmployeeId = user?.employeeId ?? '';
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['leaves'] });
@@ -24,7 +25,14 @@ export function LeavesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-semibold">{t(I18N_KEYS.NAV_LEAVES)}</h1>
+      <header>
+        <h1 className="text-3xl font-semibold">{t(I18N_KEYS.NAV_LEAVES)}</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          {canManage
+            ? 'Managers see leave for their branch / team reports and can approve or reject.'
+            : 'Apply leave for yourself. Your manager will review pending requests.'}
+        </p>
+      </header>
       {error ? <p className="text-sm text-[#C62127]">{error}</p> : null}
 
       <section className={cardClass}>
@@ -34,13 +42,14 @@ export function LeavesPage() {
               className="grid gap-3"
               onSubmit={(event) => {
                 event.preventDefault();
-                const form = new FormData(event.currentTarget);
+                const formEl = event.currentTarget;
+                const form = new FormData(formEl);
                 createLeaveType({
                   name: String(form.get('name')),
                   daysAllowed: Number(form.get('daysAllowed')),
                 })
                   .then(() => {
-                    event.currentTarget.reset();
+                    formEl.reset();
                     refresh();
                   })
                   .catch((err) => setError(translateMessage(err instanceof ApiError ? err.message : err)));
@@ -59,31 +68,45 @@ export function LeavesPage() {
             className="grid gap-3"
             onSubmit={(event) => {
               event.preventDefault();
-              const form = new FormData(event.currentTarget);
+              const formEl = event.currentTarget;
+              const form = new FormData(formEl);
               setError(null);
+              const employeeId = canManage
+                ? String(form.get('employeeId') || selfEmployeeId)
+                : selfEmployeeId;
+              if (!employeeId) {
+                setError('Your login is not linked to an employee profile');
+                return;
+              }
               createLeave({
-                employeeId: String(form.get('employeeId')),
+                employeeId,
                 leaveTypeId: String(form.get('leaveTypeId')),
                 startDate: String(form.get('startDate')),
                 endDate: String(form.get('endDate')),
                 reason: String(form.get('reason')),
               })
                 .then(() => {
-                  event.currentTarget.reset();
+                  formEl.reset();
                   refresh();
                 })
                 .catch((err) => setError(translateMessage(err instanceof ApiError ? err.message : err)));
             }}
           >
             <p className="text-sm text-slate-400">Apply leave</p>
-            <select name="employeeId" className={fieldClass} required>
-              <option value="">Employee</option>
-              {(employees.data ?? []).map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.firstName} {item.lastName}
-                </option>
-              ))}
-            </select>
+            {canManage ? (
+              <select name="employeeId" className={fieldClass} defaultValue={selfEmployeeId} required>
+                <option value="">Employee (your reports)</option>
+                {(employees.data ?? []).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.firstName} {item.lastName}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                Applying as: {user?.firstName} {user?.lastName}
+              </p>
+            )}
             <select name="leaveTypeId" className={fieldClass} required>
               <option value="">Type</option>
               {(types.data ?? []).map((item) => (
@@ -95,7 +118,7 @@ export function LeavesPage() {
             <input name="startDate" type="date" className={fieldClass} required />
             <input name="endDate" type="date" className={fieldClass} required />
             <input name="reason" placeholder="Reason" className={fieldClass} required />
-            <button type="submit" className={buttonClass}>
+            <button type="submit" className={buttonClass} disabled={!canManage && !selfEmployeeId}>
               {t(I18N_KEYS.COMMON_CREATE)}
             </button>
           </form>
@@ -127,7 +150,7 @@ export function LeavesPage() {
                     <>
                       <button
                         type="button"
-                        className="text-emerald-300"
+                        className="text-emerald-600"
                         onClick={() =>
                           decideLeave(item.id, 'approve')
                             .then(refresh)

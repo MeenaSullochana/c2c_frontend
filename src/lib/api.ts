@@ -19,6 +19,13 @@ export type PublicUser = {
   locale: string;
   roleKeys: string[];
   permissions: string[];
+  employeeId?: string | null;
+  accessScope?: string;
+  orgRole?: string | null;
+  branch?: { id: string; name: string; code?: string } | null;
+  city?: { id: string; name: string } | null;
+  state?: { id: string; name: string; code?: string } | null;
+  country?: { id: string; name: string; code?: string } | null;
   tenant: {
     id: string;
     name: string;
@@ -63,15 +70,19 @@ async function parseError(response: Response): Promise<string> {
 
 export async function request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   const token = getAccessToken();
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  const headers: Record<string, string> = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  if (!isFormData && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...init.headers,
-      },
+      headers,
     });
   } catch {
     throw new ApiError('auth.api_unreachable', 0);

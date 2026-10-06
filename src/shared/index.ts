@@ -22,3 +22,19 @@ export {
   type SupportedLocale,
 } from './constants/i18n';
 export { API_PREFIX, API_ROUTES } from './constants/api';
+export {
+  LEAD_STATUSES,
+  LOAN_TYPES,
+  ACCESS_SCOPES,
+  LEAD_STATUS_LABELS,
+  LOAN_TYPE_LABELS,
+  type LeadStatus,
+  type LoanType,
+  type AccessScope,
+} from './constants/leads';
+export {
+  ORG_ROLES,
+  ORG_ROLE_LABELS,
+  ORG_ROLE_SCOPE,
+  type OrgRole,
+} from './constants/org-roles';

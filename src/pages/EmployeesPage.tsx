@@ -2,6 +2,7 @@ import { I18N_KEYS, PERMISSIONS } from '../shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { ImageFileField } from '../components/ImageFileField';
 import { buttonClass, cardClass, fieldClass, tableClass } from '../components/ui';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -36,6 +37,7 @@ export function EmployeesPage() {
   const [cityId, setCityId] = useState('');
   const [branchId, setBranchId] = useState(params.get('branchId') ?? '');
   const [roleId, setRoleId] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,7 +62,7 @@ export function EmployeesPage() {
   const canDeactivate = user?.permissions.includes(PERMISSIONS.HRM_EMPLOYEE_DEACTIVATE) ?? false;
 
   const selectedRole = (roles.data ?? []).find((item) => item.id === roleId);
-  const orgRole = selectedRole?.orgRole ?? 'STAFF';
+  const orgRole = selectedRole?.orgRole ?? 'EXECUTIVE';
   const country = tree.data?.find((item) => item.id === countryId);
   const state = country?.states.find((item) => item.id === stateId);
   const city = state?.cities.find((item) => item.id === cityId);
@@ -68,8 +70,12 @@ export function EmployeesPage() {
     () => (employees.data ?? []).filter((item) => item.branch?.id === branchId && item.status === 'ACTIVE'),
     [employees.data, branchId],
   );
-  const managers = branchEmployees.filter((item) => item.orgRole === 'MANAGER');
-  const supervisors = branchEmployees.filter((item) => item.orgRole === 'SUPERVISOR');
+  const managers = branchEmployees.filter((item) =>
+    ['BRANCH_HEAD', 'MANAGER', 'LOCATION_HEAD', 'HEAD'].includes(item.orgRole),
+  );
+  const supervisors = branchEmployees.filter((item) =>
+    ['SALES_MANAGER', 'SUPERVISOR', 'COORDINATOR_HEAD', 'BRANCH_HEAD', 'MANAGER'].includes(item.orgRole),
+  );
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['employees'] });
@@ -142,7 +148,8 @@ export function EmployeesPage() {
             className="mt-5 grid gap-3 md:grid-cols-2 lg:grid-cols-3"
             onSubmit={(event) => {
               event.preventDefault();
-              const form = new FormData(event.currentTarget);
+              const formEl = event.currentTarget;
+              const form = new FormData(formEl);
               setError(null);
               createMutation.mutate(
                 {
@@ -154,6 +161,8 @@ export function EmployeesPage() {
                   gender: String(form.get('gender') || ''),
                   address: String(form.get('address') || ''),
                   dateOfBirth: String(form.get('dateOfBirth')),
+                  photoUrl: photoUrl || '',
+                  workFromHome: form.get('workFromHome') === 'on',
                   branchId,
                   departmentId: String(form.get('departmentId')),
                   designationId: String(form.get('designationId')),
@@ -165,7 +174,11 @@ export function EmployeesPage() {
                 },
                 {
                   onError: (err) => setError(translateMessage(err instanceof ApiError ? err.message : err)),
-                  onSuccess: () => event.currentTarget.reset(),
+                  onSuccess: () => {
+                    formEl.reset();
+                    setRoleId('');
+                    setPhotoUrl('');
+                  },
                 },
               );
             }}
@@ -210,7 +223,7 @@ export function EmployeesPage() {
               <option value="">Role</option>
               {(roles.data ?? []).map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name} · min age {item.minAge}
+                  {item.name} · {item.orgRole}
                 </option>
               ))}
             </select>
@@ -219,7 +232,15 @@ export function EmployeesPage() {
             <input name="lastName" placeholder="Last name" className={fieldClass} required />
             <input name="email" type="email" placeholder="Email" className={fieldClass} required />
             <input name="phone" placeholder="Phone" className={fieldClass} />
-            <input name="dateOfBirth" type="date" className={fieldClass} required />
+            <label className="text-sm text-slate-500">
+              Date of birth
+              <input name="dateOfBirth" type="date" className={`${fieldClass} mt-1`} required />
+            </label>
+            <ImageFileField label="Profile photo (optional)" value={photoUrl} onChange={setPhotoUrl} />
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input name="workFromHome" type="checkbox" className="rounded border-slate-300" />
+              Work from home
+            </label>
             <select name="gender" className={fieldClass}>
               <option value="">Gender</option>
               <option value="female">Female</option>
@@ -239,15 +260,19 @@ export function EmployeesPage() {
                 <option key={item.id} value={item.id}>{item.name}</option>
               ))}
             </select>
-            {orgRole !== 'MANAGER' ? (
-              <select name="managerId" className={fieldClass} required={orgRole === 'SUPERVISOR'}>
+            {orgRole !== 'BRANCH_HEAD' && orgRole !== 'MANAGER' && orgRole !== 'HEAD' && orgRole !== 'REGIONAL_HEAD' && orgRole !== 'LOCATION_HEAD' ? (
+              <select
+                name="managerId"
+                className={fieldClass}
+                required={orgRole === 'SALES_MANAGER' || orgRole === 'SUPERVISOR'}
+              >
                 <option value="">Manager</option>
                 {managers.map((item) => (
                   <option key={item.id} value={item.id}>{item.firstName} {item.lastName}</option>
                 ))}
               </select>
             ) : null}
-            {orgRole === 'STAFF' ? (
+            {orgRole === 'EXECUTIVE' || orgRole === 'STAFF' || orgRole === 'COORDINATOR' ? (
               <select name="supervisorId" className={fieldClass} required>
                 <option value="">Supervisor</option>
                 {supervisors.map((item) => (
@@ -262,7 +287,7 @@ export function EmployeesPage() {
           </form>
           {selectedRole ? (
             <p className="mt-3 text-xs text-slate-500">
-              Role {selectedRole.name} requires age {selectedRole.minAge}+ and maps to {selectedRole.orgRole}.
+              Role {selectedRole.name} maps to {selectedRole.orgRole}.
             </p>
           ) : null}
         </section>
@@ -276,6 +301,7 @@ export function EmployeesPage() {
               <th>Name</th>
               <th>Branch</th>
               <th>Role</th>
+              <th>WFH</th>
               <th>Reports</th>
               <th>Status</th>
               <th></th>
@@ -285,9 +311,21 @@ export function EmployeesPage() {
             {(employees.data ?? []).map((item) => (
               <tr key={item.id} className="border-t border-slate-200">
                 <td className="py-3">{item.employeeCode}</td>
-                <td>{item.firstName} {item.lastName}</td>
+                <td>
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={item.photoUrl || '/default-avatar.svg'}
+                      alt=""
+                      className="h-8 w-8 rounded-full object-cover bg-slate-100"
+                    />
+                    <span>
+                      {item.firstName} {item.lastName}
+                    </span>
+                  </div>
+                </td>
                 <td>{item.branch?.name}</td>
                 <td>{item.role?.name || item.orgRole}</td>
+                <td>{item.workFromHome ? 'Yes' : 'No'}</td>
                 <td>{item.supervisor?.name || item.manager?.name || '—'}</td>
                 <td>{item.status}</td>
                 <td>
