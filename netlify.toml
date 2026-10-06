@@ -5,7 +5,7 @@
 [build.environment]
   NODE_VERSION = "20"
   NPM_CONFIG_PRODUCTION = "false"
-  VITE_API_URL = "https://c2c-backend-j01d.onrender.com/api"
+  VITE_API_URL = "https://c2c-backend-1.onrender.com/api"
 
 [[redirects]]
   from = "/*"
