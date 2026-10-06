@@ -3,6 +3,7 @@
   publish = "dist"
 
 [build.environment]
+  NODE_VERSION = "20"
   VITE_API_URL = "https://c2c-backend-j01d.onrender.com/api"
 
 [[redirects]]
